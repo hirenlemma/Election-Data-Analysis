@@ -13,8 +13,8 @@ library(ggthemes)
 library(tidycensus)
 library(readr)
 library(readxl)
-raw_data <- read_csv("final_project/raw_data.csv")
-adjusted_pop_data <- read_excel("final_project/adjusted_pop_data.xlsx")
+raw_data <- read_csv("raw_data.csv")
+adjusted_pop_data <- read_excel("adjusted_pop_data.xlsx")
 
 ui <- navbarPage(
     "National Election Data",

@@ -1,0 +1,136 @@
+---
+title: "new_raw_data"
+author: "Hiren Lemma"
+date: "10/14/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(ggthemes)
+library(tidyverse)
+library(tidycensus)
+
+```
+
+```{r}
+
+raw_data <- read_csv("data/1976-2016-president.csv")
+pop_data <- read_csv("data/nst-est2019-alldata.csv")
+adjusted_pop_data <- read_excel("data/adjusted_pop_data.xlsx")
+
+```
+
+```{r}
+
+by_election <- raw_data %>%
+  select(year, state, candidate, party, candidatevotes, totalvotes) %>%
+  filter(party %in% c("democrat", "republican"),
+         candidate != "Other")
+
+by_election$candidate[by_election$candidate == "Mitt, Romney"] <- "Romney, Mitt"
+
+by_election <- by_election %>%
+  group_by(year, candidate, party) %>%
+  nest() %>%
+  mutate(candidate_vote = map_dbl(data, ~ sum(.$candidatevotes))) %>%
+  select(-data) %>%
+  pivot_wider(id_cols = "year",
+              names_from = "party",
+              values_from = c("candidate", "candidate_vote")) %>%
+  mutate(total_votes = candidate_vote_democrat + candidate_vote_republican)
+
+by_election
+
+```
+
+```{r}
+
+first <- by_election %>%
+  pivot_longer(cols = c("candidate_democrat", "candidate_republican"),
+               names_to = "party",
+               values_to = "candidate")
+
+final_data <- first %>%
+  pivot_longer(cols = c("candidate_vote_democrat", "candidate_vote_republican"),
+               names_to = "vote",
+               values_to = "party_vote")
+
+
+  ggplot(data = final_data, mapping = aes(x = year, y = party_vote, fill = vote)) +
+    geom_col(position = "dodge", color = "black") +
+    scale_x_continuous(breaks = seq(1976, 2016, by = 4)) +
+    labs(title = "Election Data, 1976-2016",
+         x = "Year",
+         y = "Votes") +
+    scale_fill_manual(values = c("dodgerblue", "salmon"),
+                      name = c("Political Party"),
+                      labels = c("Democrat", "Republican")) +
+    theme_bw()
+
+```
+
+```{r}
+
+raw_data %>%
+  filter(state == "New York") %>%
+  select(year, state, totalvotes) %>%
+  group_by(year) %>%
+  summarise(total_vote = sum(totalvotes)) %>%
+  ggplot(aes(x = year, y = total_vote)) +
+  geom_line() +
+  scale_x_continuous(breaks = seq(1976, 2016, by = 4)) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_pander() +
+  labs(title = "Total Votes by Year, New York",
+       x = "Year",
+       y = "Total Votes",
+       caption = "Data via MIT Election Data and Science Lab")
+
+```
+
+```{r}
+
+pop_data %>%
+  select(NAME, POPESTIMATE2016)
+
+data_raw <- raw_data %>%
+  filter(state == "New York") %>%
+  select(year, state, totalvotes) %>%
+  group_by(year) %>%
+  summarise(total_vote = sum(totalvotes))
+
+left_join(data_raw, pop_data, by = c("state" = "NAME")) %>%
+  select(year, state, totalvotes, POPESTIMATE2016)
+
+raw_data %>%
+  filter(state == "New York") %>%
+  select(year, state, totalvotes) %>%
+  group_by(year) %>%
+  summarise(total_vote = sum(totalvotes)) %>%
+  ggplot(aes(x = year, y = total_vote)) +
+  geom_line() +
+  scale_x_continuous(breaks = seq(1976, 2016, by = 4)) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_pander() +
+  labs(title = "Total Votes by Year, New York",
+       x = "Year",
+       y = "Total Votes")
+
+```
+
+```{r}
+
+adjusted_pop_data$YEAR <- as_factor(adjusted_pop_data$YEAR)
+
+adjusted_pop_data %>%
+  filter(STATE == "California") %>%
+  ggplot(aes(x = YEAR, y = ELIGIBLE, fill = RACE)) +
+  geom_col(position = "dodge") +
+  scale_fill_brewer(palette = "Pastel2") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_pander()
+
+```
+

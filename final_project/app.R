@@ -27,9 +27,16 @@ ui <- navbarPage(
                              inputId = "state",
                              label = "Select State",
                              choices = state.name
+                             
+          # setting the functionality of the drop down for states
+          
                          )),
                      mainPanel(plotOutput("graph"),
                                plotOutput("other")))
+          
+          # set two distinct plot outputs by making them individualized within
+          # the same mainPanel().
+          
              )),
     tabPanel("Discussion",
              titlePanel("Discussion Title"),
@@ -57,13 +64,23 @@ server <- function(input, output) {
   output$graph <- renderPlot({
       raw_data %>%
       filter(state == input$state) %>%
+      
+      # set the input$state value here for filtering
+      
       select(year, state, totalvotes) %>%
       group_by(year) %>%
       summarise(total_vote = sum(totalvotes)) %>%
+      
+      # used a summarise function to find total number of votes per year
+      
       ggplot(aes(x = year, y = total_vote)) +
       geom_line() +
       scale_x_continuous(breaks = seq(1976, 2016, by = 4)) +
       scale_y_continuous(labels = scales::comma) +
+      
+      # used seq() to set the time range and four year sections, and used 
+      # scales::comma to change how the values along the y-axis presented
+      
       theme_pander() +
       labs(title = "Total Votes Cast for Presidential Elections",
            x = "Year",
@@ -74,8 +91,15 @@ server <- function(input, output) {
   output$other <- renderPlot({
     adjusted_pop_data %>%
       filter(STATE == input$state) %>%
+      
+      # again used the same input$state value here
+      
       ggplot(aes(x = YEAR, y = ELIGIBLE, fill = RACE)) +
       geom_col(position = "dodge") +
+      
+      # set position to "dodge" so that the races/ethnicities could be compared
+      # more effectively
+      
       scale_fill_brewer(palette = "Pastel2") +
       scale_y_continuous(labels = scales::comma) +
       theme_pander() +

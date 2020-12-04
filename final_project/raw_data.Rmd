@@ -11,18 +11,42 @@ knitr::opts_chunk$set(echo = TRUE)
 library(ggthemes)
 library(tidyverse)
 library(tidycensus)
+library(readr)
+library(readxl)
+library(rstanarm)
+library(gtsummary)
+library(broom.mixed)
+library(gt)
+census_api_key("75b2f27ae13c75bf44dd783ba197c3c236988b0c")
+
+raw_data <- read_csv("raw_data.csv")
+population_data <- read_csv("population_data.csv")
+adjusted_pop_data <- read_excel("adjusted_pop_data.xlsx")
+county_data <- read_csv("countypres_2000-2016.csv")
+EducationReport <- read_csv("EducationReport.csv")
+poverty <- read_csv("poverty.csv",
+                    col_types = cols("County ID" = col_integer()))
+demographics <- read_csv("demographics.csv",
+                         col_types = cols(.default = col_character(),
+                                          A00AA = col_integer(),
+                                          B57AA = col_integer(),
+                                          B57AB = col_integer(),
+                                          B57AC = col_integer(),
+                                          B57AD = col_integer(),
+                                          B57AE = col_integer(),
+                                          B57AF = col_integer(),
+                                          B57AP = col_integer(),
+                                          B57AQ = col_integer(),
+                                          B57AR = col_integer()))
+data2020 <- read_csv("data2020.csv")
+education <- read_csv("education.csv")
+povertyyy <- read_csv("povertyyy.csv")
 
 ```
 
 ```{r}
 
-raw_data <- read_csv("data/1976-2016-president.csv")
-pop_data <- read_csv("data/nst-est2019-alldata.csv")
-adjusted_pop_data <- read_excel("data/adjusted_pop_data.xlsx")
-
-```
-
-```{r}
+# pivoted raw_data to get individual columns for votes per party
 
 by_election <- raw_data %>%
   select(year, state, candidate, party, candidatevotes, totalvotes) %>%
@@ -46,6 +70,8 @@ by_election
 ```
 
 ```{r}
+
+# created basic graph of election data 1976-2016
 
 first <- by_election %>%
   pivot_longer(cols = c("candidate_democrat", "candidate_republican"),
@@ -72,6 +98,8 @@ final_data <- first %>%
 ```
 
 ```{r}
+
+# created graphs for longitudinal analysis of voter turnout
 
 raw_data %>%
   filter(state == "New York") %>%
@@ -122,6 +150,8 @@ raw_data %>%
 
 ```{r}
 
+# racial distrubtion of eligible voters
+
 adjusted_pop_data$YEAR <- as_factor(adjusted_pop_data$YEAR)
 
 adjusted_pop_data %>%
@@ -130,7 +160,287 @@ adjusted_pop_data %>%
   geom_col(position = "dodge") +
   scale_fill_brewer(palette = "Pastel2") +
   scale_y_continuous(labels = scales::comma) +
-  theme_pander()
+  theme_pander() +
+  labs(title = "Distribution of Eligible Voters, by Race",
+           x = "Year",
+           y = "Number of Eligible Voters",
+           caption = "Data via Pew Research Center")
+
+```
+
+```{r rural}
+
+rural <- get_decennial(geography = "county",
+                       variables = c("P001001", "P002005"),
+                       year = 2010,
+                       output = "wide",
+                       geometry = TRUE) %>%
+  rename(state = NAME) %>%
+  mutate(prop_rural = P002005/P001001,
+         state = reorder(state, prop_rural),
+         FIPS = as.numeric(GEOID))
+
+```
+
+```{r}
+
+county_party <- county_data %>%
+  filter(party %in% c("democrat", "republican")) %>%
+  mutate(vote_percentage = candidatevotes/totalvotes) %>%
+  distinct(year, party, FIPS, .keep_all = TRUE) %>%
+  pivot_wider(id_cols = c("year", "FIPS"),
+              names_from = "party",
+              values_from = "vote_percentage") %>%
+  unnest() %>%
+  left_join(rural, by = "FIPS") %>%
+  mutate(state_name = trimws(str_extract(state, "(?<=,).*")),
+         FIPS = as.integer(FIPS)) %>%
+  select(year, FIPS, democrat, republican, geometry, state_name)
+
+county_party
+
+```
+
+```{r map}
+
+county_party %>%
+  filter(state_name == "Alabama",
+         year == "2012") %>%
+  ggplot(aes(fill = democrat, geometry = geometry)) +
+    geom_sf()
+
+```
+
+```{r}
+
+# manipulated county_party
+
+manipulated <- county_party %>%
+  mutate(republican2 = (republican * -1) + 1,
+         democrat2 = democrat + 1) %>%
+  pivot_longer(cols = republican2:democrat2,
+               names_to = "party",
+               values_to = "density")
+
+manipulated
+
+manipulated %>%
+  filter(state_name == "Alabama",
+         year == "2012") %>%
+  ggplot(aes(fill = density, geometry = geometry)) +
+    geom_sf(high_color = "blue", low_color = "white")
+
+```
+
+```{r}
+
+county_poverty <- poverty %>%
+  right_join(rural, by = c("County ID" = "FIPS")) %>%
+  mutate(state_name = trimws(str_extract(state, "(?<=,).*"))) %>%
+  select("All Ages SAIPE Poverty Universe", "All Ages in Poverty Count",
+         "Median Household Income in Dollars", geometry, state, state_name) %>%
+  rename(All = "All Ages SAIPE Poverty Universe",
+         Poverty = "All Ages in Poverty Count",
+         "Median Household" = "Median Household Income in Dollars",
+         with_county = state) %>%
+  relocate(state_name, with_county) %>%
+  mutate(density = Poverty/All)
+
+county_poverty %>%
+  filter(state_name == "Kentucky") %>%
+  ggplot(aes(fill = density, geometry = geometry)) +
+    geom_sf() +
+    scale_fill_gradient(high = "#242440", low = "white") +
+    theme_map() +
+    theme(legend.position = "right")
+
+```
+
+```{r}
+
+data2020 %>%
+  select(state, dem_votes, rep_votes, other_votes, stateid) %>%
+  drop_na(stateid) %>%
+  mutate(total_votes = dem_votes + rep_votes + other_votes)
+
+raw_data %>%
+  filter(state == "New York") %>%
+  select(year, state, totalvotes) %>%
+  group_by(year) %>%
+  summarise(total_vote = sum(totalvotes))
+
+
+  ggplot(aes(x = year, y = total_vote)) +
+  geom_line() +
+  scale_x_continuous(breaks = seq(1976, 2016, by = 4)) +
+  scale_y_continuous(labels = scales::comma) +
+  theme_pander() +
+  labs(title = "Total Votes by Year, New York",
+       x = "Year",
+       y = "Total Votes",
+       caption = "Data via MIT Election Data and Science Lab")
+
+```
+
+```{r}
+
+county_demo_2000 <- demographics %>%
+  filter(YEAR == 2000, STATE != "Alaska") %>%
+  mutate(FIPS = paste0(STATEFP, COUNTYFP),
+         rural_pop = as.numeric(A57AD)/as.numeric(A00AA),
+         under_20 = (B57AA + B57AB + B57AC + B57AD + B57AE + B57AF)/A00AA,
+         over_65 = (B57AP + B57AQ + B57AR)/A00AA,
+         YEAR = 2000) %>%
+  rename(total = A00AA) %>%
+  mutate(FIPS = as.integer(FIPS)) %>%
+  select(FIPS, YEAR, STATE, COUNTY, total, under_20, over_65, rural_pop)
+
+county_demo_2004 <- demographics %>%
+  filter(YEAR == 2000, STATE != "Alaska") %>%
+  mutate(FIPS = paste0(STATEFP, COUNTYFP),
+         rural_pop = as.numeric(A57AD)/as.numeric(A00AA),
+         under_20 = (B57AA + B57AB + B57AC + B57AD + B57AE + B57AF)/A00AA,
+         over_65 = (B57AP + B57AQ + B57AR)/A00AA,
+         YEAR = 2004) %>%
+  rename(total = A00AA) %>%
+  mutate(FIPS = as.integer(FIPS)) %>%
+  select(FIPS, YEAR, STATE, COUNTY, total, under_20, over_65, rural_pop)
+
+county_demo_2008 <- demographics %>%
+  filter(YEAR == 2000, STATE != "Alaska") %>%
+  mutate(FIPS = paste0(STATEFP, COUNTYFP),
+         rural_pop = as.numeric(A57AD)/as.numeric(A00AA),
+         under_20 = (B57AA + B57AB + B57AC + B57AD + B57AE + B57AF)/A00AA,
+         over_65 = (B57AP + B57AQ + B57AR)/A00AA,
+         YEAR = 2008) %>%
+  rename(total = A00AA) %>%
+  mutate(FIPS = as.integer(FIPS)) %>%
+  select(FIPS, YEAR, STATE, COUNTY, total, under_20, over_65, rural_pop)
+
+county_demo_2012 <- demographics %>%
+  filter(YEAR == 2010, STATE != "Alaska") %>%
+  mutate(FIPS = paste0(STATEFP, COUNTYFP),
+         rural_pop = as.numeric(A57AD)/as.numeric(A00AA),
+         under_20 = (B57AA + B57AB + B57AC + B57AD + B57AE + B57AF)/A00AA,
+         over_65 = (B57AP + B57AQ + B57AR)/A00AA,
+         YEAR = 2012) %>%
+  rename(total = A00AA) %>%
+  mutate(FIPS = as.integer(FIPS)) %>%
+  select(FIPS, YEAR, STATE, COUNTY, total, under_20, over_65, rural_pop)
+
+county_demo_2016 <- demographics %>%
+  filter(YEAR == 2010, STATE != "Alaska") %>%
+  mutate(FIPS = paste0(STATEFP, COUNTYFP),
+         rural_pop = as.numeric(A57AD)/as.numeric(A00AA),
+         under_20 = (B57AA + B57AB + B57AC + B57AD + B57AE + B57AF)/A00AA,
+         over_65 = (B57AP + B57AQ + B57AR)/A00AA,
+         YEAR = 2016) %>%
+  rename(total = A00AA) %>%
+  mutate(FIPS = as.integer(FIPS)) %>%
+  select(FIPS, YEAR, STATE, COUNTY, total, under_20, over_65, rural_pop)
+
+county_demo <- bind_rows(county_demo_2000, county_demo_2004, county_demo_2008,
+          county_demo_2012, county_demo_2016)
+
+inner_join(two, county_poverty$density, )
+
+```
+
+```{r}
+
+statistical_data <- inner_join(county_party, county_demo, by = "FIPS") %>%
+  drop_na() %>%
+  select(FIPS, YEAR, STATE, COUNTY, total, under_20, over_65, rural_pop,
+         democrat, republican)
+
+model_1 <- stan_glm(data = statistical_data,
+         formula = democrat ~ under_20 + over_65 + rural_pop + YEAR,
+         refresh = 0)
+
+print(model_1, digits = 4)
+
+tbl_regression(model_1) %>%
+  as_gt() %>%
+  tab_header(title = "Regression of Predicted Democratic Leaning",
+             subtitle = "The Effect of Demographic Elements on Democratic Voting History")
+```
+
+```{r}
+
+county_party %>%
+  filter(year = )
+
+
+left_join(county_party, yeah, by = "FIPS")
+
+```
+
+```{r}
+
+edu <- education %>%
+  filter(YEAR == 2000) %>%
+  mutate(FIPS = paste0(STATEFP, COUNTYFP)) %>%
+  rename(less_than9 = B69AA, college3 = B69AB, college4 = B69AC) %>%
+  select(FIPS, YEAR, STATE, COUNTY, less_than9, college3, college4) %>%
+  mutate(FIPS = as.integer(FIPS))
+
+county_demo %>%
+  select(FIPS, total) %>%
+  right_join(edu, by = "FIPS") %>%
+  select(FIPS, YEAR, STATE, COUNTY, total, less_than9, college3, college4) %>%
+  mutate(less9 = less_than9/total,
+         college = college3/total,
+         morecollege = college4/total) %>%
+  select(FIPS, YEAR, less9, college, morecollege) %>%
+  unique()
+
+```
+
+```{r}
+
+povv <- povertyyy %>%
+  mutate(FIPS = paste0(STATEFP, COUNTYFP)) %>%
+  select(FIPS, STATE, COUNTY, CL6AA2000) %>%
+  mutate(FIPS = as.integer(FIPS))
+
+```
+
+maps (all 2000) = under20, over65, rural_pop, demo, rep, poverty
+statistical = under20, over65, rural_pop, democrat, republican
+
+```{r}
+
+cleaned_demo <- county_demo %>%
+  filter(YEAR == 2000) %>%
+  select(FIPS, STATE, under_20, over_65, rural_pop)
+
+cleaned_election <- county_party %>%
+  filter(year == 2000) %>%
+  select(FIPS, democrat, republican, geometry)
+
+cleaned_poverty <- county_demo %>%
+  select(FIPS, total) %>%
+  left_join(povv, by = "FIPS") %>%
+  unique() %>%
+  mutate(poverty = CL6AA2000/total) %>%
+  select(FIPS, poverty)
+
+double <- cleaned_election %>%
+  left_join(cleaned_demo, by = "FIPS")
+
+maps_data <- double %>%
+  left_join(cleaned_poverty, by = "FIPS") %>%
+  select(FIPS, STATE, under_20, over_65, rural_pop, poverty, democrat,
+         republican, geometry)
+
+```
+
+```{r}
+
+maps_data %>%
+  filter(STATE == "Alabama") %>%
+  ggplot(aes(fill = democrat, geometry = geometry)) +
+    geom_sf()
 
 ```
 

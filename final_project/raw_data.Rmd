@@ -342,27 +342,45 @@ county_demo_2016 <- demographics %>%
 county_demo <- bind_rows(county_demo_2000, county_demo_2004, county_demo_2008,
           county_demo_2012, county_demo_2016)
 
-inner_join(two, county_poverty$density, )
 
 ```
 
 ```{r}
 
-statistical_data <- inner_join(county_party, county_demo, by = "FIPS") %>%
+statistical_data <- left_join(county_party, county_demo,
+                              by = c("FIPS", "year" = "YEAR")) %>%
   drop_na() %>%
-  select(FIPS, YEAR, STATE, COUNTY, total, under_20, over_65, rural_pop,
-         democrat, republican)
+  select(FIPS, year, STATE, COUNTY, total, under_20, over_65, rural_pop,
+         democrat, republican) %>%
+  mutate(year = as.factor(year)) %>%
+  mutate_at(vars(under_20:republican), .funs = funs(.*100))
 
 model_1 <- stan_glm(data = statistical_data,
-         formula = democrat ~ under_20 + over_65 + rural_pop + YEAR,
+         formula = democrat ~ under_20 + over_65 + rural_pop + year,
+         refresh = 0)
+
+model_2 <- stan_glm(data = statistical_data,
+         formula = republican ~ under_20 + over_65 + rural_pop + year,
          refresh = 0)
 
 print(model_1, digits = 4)
 
-tbl_regression(model_1) %>%
+tbl_regression(model_2,
+               intercept = TRUE,
+               label = list("(Intercept)" ~ "Intercept",
+                            "under_20" ~ "Under 20",
+                            "over_65" ~ "Over 65",
+                            "rural_pop" ~ "Rural Population",
+                            "year" ~ "Year"),
+               estimate_fun = function(x) style_sigfig(x, digits = 5)) %>%
   as_gt() %>%
   tab_header(title = "Regression of Predicted Democratic Leaning",
              subtitle = "The Effect of Demographic Elements on Democratic Voting History")
+
+
+
+"hello my name is bridgit nice to meet you I think youre famous where have I seen you"
+
 ```
 
 ```{r}
@@ -372,6 +390,15 @@ county_party %>%
 
 
 left_join(county_party, yeah, by = "FIPS")
+
+
+
+hi <- statistical_data %>%
+  rename("Under 20" = under_20)
+
+stan_glm(data = hi,
+         formula = democrat ~ "Under 20",
+         refresh = 0)
 
 ```
 

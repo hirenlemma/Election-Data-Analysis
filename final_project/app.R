@@ -1,11 +1,5 @@
-#
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
+
+# Load libraries needed to create app, graphs, gt table
 
 library(shiny)
 library(shinythemes)
@@ -17,19 +11,25 @@ library(readxl)
 library(gtsummary)
 library(broom.mixed)
 library(gt)
+
+# Load data sets needed, objects in RDS file format
+
 raw_data <- read_csv("raw_data.csv")
 adjusted_pop_data <- read_excel("adjusted_pop_data.xlsx")
 census_api_key("75b2f27ae13c75bf44dd783ba197c3c236988b0c")
-county_data <- read_csv("countypres_2000-2016.csv")
+county_data <- read_csv("county_data.csv")
 poverty <- read_csv("poverty.csv",
                     col_types = cols("County ID" = col_integer()))
-rural <- readRDS("mapdata.RDS")
+rural <- readRDS("rural.RDS")
 statistical_data <- readRDS("statistical_data.rds")
 maps_data <- readRDS("maps_data.rds")
-model_1 <- readRDS("model_1.rds")
+model_1_table <- readRDS("model_1_table.rds")
 
 ui <- navbarPage(
   "National Election Data",
+  
+  # About section
+  
   tabPanel("About", 
            titlePanel("About"),
            h3("An Overview"),
@@ -56,10 +56,16 @@ ui <- navbarPage(
            h5("Hello! My name is Hiren Lemma and I study Government and African &
                African American Studies as part of the Harvard College Class of
                2024. You can reach me at hirenlemma@college.harvard.edu.")),
+  
+  # Section with data analysis over longer period of time
+  
   tabPanel("Longitudinal Analysis",
            titlePanel("Longitudinal Analysis"),
            fluidPage(
              theme = shinytheme("yeti"),
+             
+             # Set theme, continued throughout all tabPanels
+             
              h5("The best way to contextualize the larger scope of this project
                  was to begin by exploring the trends over the 40 years of data
                  that was accessible. The first graph provides the total votes
@@ -82,7 +88,8 @@ ui <- navbarPage(
                    label = "Select State",
                    choices = state.name
                    
-                   # setting the functionality of the drop down for states
+                   # Setting the functionality of the drop down for states
+                   # state.name is a pre-created data set within R
                    
                  )),
                mainPanel(plotOutput("graph"),
@@ -90,9 +97,10 @@ ui <- navbarPage(
                          plotOutput("other"),
                          br())),
              
-             # set two distinct plot outputs by making them individualized within
-             # the same mainPanel().
-             
+             # Created two plot outputs based on the 'state1' input correlated
+             # code included below in server
+             # Included br() to add space between and below graphs
+
            )),
   tabPanel("Interactive Map",
            titlePanel("Interactive Map"),
@@ -122,6 +130,12 @@ ui <- navbarPage(
                    label = "Select Year",
                    choices = c(2000, 2004, 2008, 2012, 2016)
                  )),
+               
+               # Create selection input options for political party, state, and
+               # year
+               # Use new inputId because this input is interacting with a
+               # distinct server from that of the last graph
+               
                mainPanel(plotOutput("map"),
                          br())
                  )
@@ -144,12 +158,12 @@ ui <- navbarPage(
              sidebarLayout(
                sidebarPanel(
                  selectInput(
-                   inputId = "state5",
+                   inputId = "state3",
                    label = "Select State",
                    choices = state.name[which(state.name != "Alaska")]
                  ),
                  selectInput(
-                   inputId = "partyy",
+                   inputId = "party2",
                    label = "Republican or Democrat",
                    choices = c("Republican" = "republican",
                                "Democrat" = "democrat")
@@ -162,6 +176,13 @@ ui <- navbarPage(
                                "Rural Population" = "rural_pop",
                                "Poverty" = "poverty")
                  )),
+               
+               # Created new inputIds for state, political party, and metric of
+               # comparison
+               # Excluded Alaska from options for state selection because of
+               # little available data on counties in the state
+               # Used "" = "" format to make options for comparisons clearer
+               
                mainPanel(plotOutput("partymap"),
                          br(),
                          plotOutput("comparemap"),
@@ -170,6 +191,10 @@ ui <- navbarPage(
   tabPanel("Model",
            titlePanel("Regression Modeling"),
            gt_output("statmodel"),
+           
+           # Used gt_output in this case because of different data
+           # representation format
+           
            h5("This statistical model analyzes each characteristic within the
                 data in tandem to provide predictive values based on the extent
                 to which each characteristic affects tendencies within the
@@ -203,14 +228,11 @@ server <- function(input, output) {
     raw_data %>%
       filter(state == input$state1) %>%
       
-      # set the input$state value here for filtering
+      # Used input$[variable] format here for filtering
       
       select(year, state, totalvotes) %>%
       group_by(year) %>%
       summarise(total_vote = sum(totalvotes)) %>%
-      
-      # used a summarise function to find total number of votes per year
-      
       ggplot(aes(x = year, y = total_vote)) +
       geom_line(color = "#8596a7",
                 lwd = 1.5) +
@@ -218,28 +240,22 @@ server <- function(input, output) {
       scale_x_continuous(breaks = seq(1976, 2016, by = 4)) +
       scale_y_continuous(labels = scales::comma) +
       
-      # used seq() to set the time range and four year sections, and used 
-      # scales::comma to change how the values along the y-axis presented
+      # Used seq() to set the time range and four year sections
+      # Used scales::comma to change how the values along the y-axis presented
       
       theme_pander() +
       labs(title = "Total Votes Cast for Presidential Elections",
            x = "Year",
            y = "Total Votes Cast",
            caption = "Data via MIT Election Data and Science Lab")
+    
   })
   
   output$other <- renderPlot({
     adjusted_pop_data %>%
       filter(STATE == input$state1) %>%
-      
-      # again used the same input$state value here
-      
       ggplot(aes(x = YEAR, y = ELIGIBLE, fill = RACE)) +
       geom_col(position = "dodge") +
-      
-      # set position to "dodge" so that the races/ethnicities could be compared
-      # more effectively
-      
       scale_fill_manual(values = c("#242440", "#8596a7", "#a6cccc",
                                    "#eeeedb")) +
       scale_x_continuous(breaks = c(2000, 2010, 2018),
@@ -262,6 +278,12 @@ server <- function(input, output) {
       high_color = "firebrick"
       low_color = "white"
     }
+    
+    # Used if(){} format here to adjust colors used to convey density on maps
+    # based on political party
+    # Created new objects 'high_color' and 'low_color' to be used as inputs
+    # later in code
+    
     county_data %>%
       filter(party %in% c("democrat", "republican")) %>%
       mutate(vote_percentage = candidatevotes/totalvotes) %>%
@@ -288,19 +310,27 @@ server <- function(input, output) {
   })
     
   output$partymap <- renderPlot({
-    if(input$partyy == "democrat"){
+    if(input$party2 == "democrat"){
       high_color = "dodgerblue3"
       low_color = "white"
       NAME = "Democrat"
     }
-    if(input$partyy == "republican"){
+    if(input$party2 == "republican"){
       high_color = "firebrick"
       low_color = "white"
       NAME = "Republican"
     }
+    
+    # Again, used if(){} format to adjust by political party
+    
     maps_data %>%
-      filter(STATE == input$state5) %>%
-      ggplot(aes_string(fill = input$partyy, geometry = "geometry")) +
+      filter(STATE == input$state3) %>%
+      ggplot(aes_string(fill = input$party2, geometry = "geometry")) +
+      
+      # Used aes_string() instead of standard aes() because the fill was a
+      # dynamic input instead of a static value
+      # Also put geometry into quotation marks because of aes_string()
+      
       geom_sf() +
       scale_fill_gradient(high = high_color, low = low_color,
                           limits = c(0, 1),
@@ -324,8 +354,13 @@ server <- function(input, output) {
     if(input$compare == "poverty"){
       NAME = "Poverty"
     }
+    
+    # Again used if(){} format, this time to change the title labels for each of
+    # the gradient legends
+    # Also (again) created new object, 'NAME', to be inputted later
+    
     maps_data %>%
-      filter(STATE == input$state5) %>%
+      filter(STATE == input$state3) %>%
       ggplot(aes_string(fill = input$compare, geometry = "geometry")) +
       geom_sf() +
       scale_fill_gradient(high = "#242440", low = "white",
@@ -337,16 +372,11 @@ server <- function(input, output) {
   })
   
   output$statmodel <- render_gt({
-    tbl_regression(model_1, intercept = TRUE,
-                   label = list("(Intercept)" ~ "Intercept",
-                                "under_20" ~ "Under 20",
-                                "over_65" ~ "Over 65",
-                                "rural_pop" ~ "Rural Population",
-                                "year" ~ "Year"),
-                   estimate_fun = function(x) style_sigfig(x, digits = 5)) %>%
-      as_gt() %>%
-      tab_header(title = "Regression of Predicted Democratic Leaning",
-                 subtitle = "The Effect of Demographic Elements on Democratic Voting History")
+    model_1_table
+    
+    # Stored all data for the model_1 table as an RDS file to make app run more
+    # quickly and efficiently
+    
   })
     
 }

@@ -45,7 +45,7 @@ edu_data <- read_csv("edu_data.csv") %>%
 
 ```{r}
 
-# created graphs for longitudinal analysis of voter turnout
+# Created graphs for longitudinal analysis of voter turnout
 
 raw_data %>%
   filter(state == "New York") %>%
@@ -66,7 +66,7 @@ raw_data %>%
 
 ```{r}
 
-# racial distrubution of eligible voters
+# Racial distribution of eligible voters
 
 adjusted_pop_data %>%
   filter(STATE == "California") %>%
@@ -85,7 +85,7 @@ adjusted_pop_data %>%
 
 ```{r}
 
-# created interactive map
+# Created interactive map
 
 rural <- get_decennial(geography = "county",
                        variables = c("P001001", "P002005"),
@@ -191,7 +191,7 @@ county_demo <- bind_rows(county_demo_2000, county_demo_2004, county_demo_2008,
 
 ```{r}
 
-# create stored object for statistical comparison, create model
+# Create stored object for statistical comparison, create model
 
 statistical_data <- left_join(county_party, county_demo,
                               by = c("FIPS", "year" = "YEAR")) %>%

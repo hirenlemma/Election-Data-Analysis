@@ -1,12 +1,12 @@
 ---
-title: "cleaned_data"
+title: "Cleaned Data"
 author: "Hiren Lemma"
 date: "12/13/2020"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 
 library(ggthemes)
 library(tidyverse)
@@ -232,44 +232,11 @@ pov2000 <- poverty %>%
 
 ```{r}
 
-# Filtered data for 2000, used for comparative maps
-
-# demographic (age, rural)
-
-demo2000 <- county_demo %>%
-  filter(YEAR == 2000) %>%
-  select(FIPS, STATE, under_20, over_65, rural_pop)
-
-# political party
-
-election2000 <- county_party %>%
-  filter(year == 2000) %>%
-  select(FIPS, Democrat, Republican, geometry)
-
-# poverty
-
-poverty2000 <- county_demo %>%
-  select(FIPS, total) %>%
-  left_join(pov2000, by = "FIPS") %>%
-  unique() %>%
-  mutate(poverty = CL6AA2000/total) %>%
-  select(FIPS, poverty)
-
-double <- election2000 %>%
-  left_join(demo2000, by = "FIPS")
-
-maps_data <- double %>%
-  left_join(poverty2000, by = "FIPS") %>%
-  select(FIPS, STATE, under_20, over_65, rural_pop, poverty, Democrat,
-         Republican, geometry)
-
-```
-
-```{r}
-
 FIPSGEO <- county_party %>%
   filter(year == 2000) %>%
   select(FIPS, geometry)
+
+# Education data for 2000
 
 county_edu <- county_demo %>%
   left_join(edu_data, by = c("FIPS", "YEAR")) %>%
@@ -281,13 +248,53 @@ county_edu <- county_demo %>%
   rename(STATE = STATE.x,
          COUNTY = COUNTY.x)
 
-county_edu %>%
-  filter(STATE == "Florida") %>%
-  ggplot(aes(fill = higheredu, geometry = geometry)) +
-    geom_sf() +
-    scale_fill_gradient(high = "dodgerblue3", low = "white") +
-    theme_map() +
-    theme(legend.position = "right")
-
 ```
 
+
+```{r}
+
+# Filtered data for 2000, used for comparative maps
+
+# Demographic (age, rural)
+
+demo2000 <- county_demo %>%
+  filter(YEAR == 2000) %>%
+  select(FIPS, STATE, under_20, over_65, rural_pop)
+
+# Political party
+
+election2000 <- county_party %>%
+  filter(year == 2000) %>%
+  select(FIPS, Democrat, Republican, geometry)
+
+# Poverty
+
+poverty2000 <- county_demo %>%
+  filter(YEAR == 2000) %>%
+  select(FIPS, total) %>%
+  left_join(pov2000, by = "FIPS") %>%
+  mutate(poverty = CL6AA2000/total) %>%
+  select(FIPS, poverty)
+
+# Joined political and demographic data
+
+double <- election2000 %>%
+  left_join(demo2000, by = "FIPS")
+
+# Joined political & demographic with poverty
+
+maps_data_preedu <- double %>%
+  left_join(poverty2000, by = "FIPS") %>%
+  select(FIPS, STATE, under_20, over_65, rural_pop, poverty, Democrat,
+         Republican, geometry)
+
+# Final object, combined political, demographic, poverty, education
+# Used to create RDS file
+
+maps_data <- county_edu %>%
+  select(FIPS, no_hs, higheredu) %>%
+  right_join(maps_data_preedu, by = "FIPS") %>%
+  select(FIPS, STATE, under_20, over_65, rural_pop, poverty, no_hs, higheredu,
+         Democrat, Republican, geometry)
+
+```

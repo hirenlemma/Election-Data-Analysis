@@ -18,8 +18,6 @@ census_api_key("75b2f27ae13c75bf44dd783ba197c3c236988b0c")
 raw_data <- read_csv("raw_data.csv")
 adjusted_pop_data <- read_excel("adjusted_pop_data.xlsx")
 county_data <- read_csv("county_data.csv")
-poverty <- read_csv("poverty.csv",
-                    col_types = cols("County ID" = col_integer()))
 statistical_data <- readRDS("statistical_data.rds")
 maps_data <- readRDS("maps_data.rds")
 model_1_table <- readRDS("model_1_table.rds")

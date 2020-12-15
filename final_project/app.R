@@ -11,19 +11,19 @@ library(readxl)
 library(gtsummary)
 library(broom.mixed)
 library(gt)
+census_api_key("75b2f27ae13c75bf44dd783ba197c3c236988b0c")
 
 # Load data sets needed, objects in RDS file format
 
 raw_data <- read_csv("raw_data.csv")
 adjusted_pop_data <- read_excel("adjusted_pop_data.xlsx")
-census_api_key("75b2f27ae13c75bf44dd783ba197c3c236988b0c")
 county_data <- read_csv("county_data.csv")
 poverty <- read_csv("poverty.csv",
                     col_types = cols("County ID" = col_integer()))
-rural <- readRDS("rural.RDS")
 statistical_data <- readRDS("statistical_data.rds")
 maps_data <- readRDS("maps_data.rds")
 model_1_table <- readRDS("model_1_table.rds")
+county_party <- readRDS("county_party.rds")
 
 ui <- navbarPage(
   "National Election Data",
@@ -34,7 +34,7 @@ ui <- navbarPage(
            titlePanel("About"),
            h3("An Overview"),
            h5("Fundamentally, this project was meant to explore trends in the
-               tendecies of counties in the United States to affiliate with a
+               tendencies of counties in the United States to affiliate with a
                given political party. Especially following this most recent
                election cycle, Americans and engaged citizens around the world
                are extremely inclined to try to understand their political
@@ -48,14 +48,30 @@ ui <- navbarPage(
                drawn by charting data over the course of multiple years and
                election cycles. As the most recent election season is upon us,
                analyses of electoral trends, especially in conversations
-               surrounding voter supression and wider societal equity, are more
+               surrounding voter suppression and wider societal equity, are more
                vital than ever. The current political atmosphere in the United
-               States is as conducive for critical historical analysis as if not
-               more so than any other period in recent history."),
+               States is as conducive for critical historical analysis as–if not
+               more so than–any other period in recent history."),
+           h3("Sources"),
+           h5("The data included within this project stem from two main
+               databases."),
+           HTML("<h5> The data indicating the political affiliation of each
+                 county based on voting records in presidential elections was
+                 collected from the <a href='https://electionlab.mit.edu/data'>
+                 MIT Election Data and Science Lab</a>. This database linked
+                 directly to <a href='https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/42MVDX'>
+                 this page within the Harvard Dataverse</a>.</h5>"),
+           HTML("<h5> The other data, which provided county-level demographic
+                 information across the United States, was collected within the
+                 <a href='www.nhgis.org'> IPUMS National Historical Geographic
+                 Information System database</a>. This site is a conglomeration
+                 of U.S. Census data tables that was used within this project to
+                 represent the ages of constituents and the density of poverty,
+                 rural living, and educational attainment</a>.</h5>"),
            h3("About Me"),
-           h5("Hello! My name is Hiren Lemma and I study Government and African &
-               African American Studies as part of the Harvard College Class of
-               2024. You can reach me at hirenlemma@college.harvard.edu.")),
+           h5("Hello! My name is Hiren Lemma and I study Government and African
+               & African American Studies as part of the Harvard College Class
+               of 2024. You can reach me at hirenlemma@college.harvard.edu.")),
   
   # Section with data analysis over longer period of time
   
@@ -71,9 +87,9 @@ ui <- navbarPage(
                  that was accessible. The first graph provides the total votes
                  caste per year over each presidential election cycle, and the
                  data is organized by state. This format also allows for
-                 comparisons between the states, as certain trend years--such as
-                 1988-- demonstrate widespread impacts on the electoral process
-                 that were notable across the United States"),
+                 comparisons between the states, as certain trend years–such as
+                 the period 1984 to 1992–demonstrate widespread impacts on the
+                 electoral process that were notable across the United States"),
              h5("Similarly, the second graph provides a longitudinal approach to
                  exploring racial dynamics year-to-year. The data used from this
                  years with Congressional elections as well, and it only counted
@@ -92,9 +108,9 @@ ui <- navbarPage(
                    # state.name is a pre-created data set within R
                    
                  )),
-               mainPanel(plotOutput("graph"),
+               mainPanel(plotOutput("linegraph"),
                          br(),
-                         plotOutput("other"),
+                         plotOutput("race"),
                          br())),
              
              # Created two plot outputs based on the 'state1' input correlated
@@ -104,10 +120,10 @@ ui <- navbarPage(
            )),
   tabPanel("Interactive Map",
            titlePanel("Interactive Map"),
-           h4("This map provides county data for each presidential election from
+           h5("This map provides county data for each presidential election from
                2000-2016. The data presentation can be adjusted between each of
-               the proinent political parties, by state*, and by year."),
-           p("*Unfortunately, county data from Alaska was unavailable, so
+               the prominent political parties, by state*, and by year."),
+           h6("*Unfortunately, county data from Alaska was unavailable, so
                analysis of this state is not included within the map portions of
                this project."),
            fluidPage(
@@ -136,22 +152,27 @@ ui <- navbarPage(
                # Use new inputId because this input is interacting with a
                # distinct server from that of the last graph
                
-               mainPanel(plotOutput("map"),
+               mainPanel(plotOutput("interactivemap"),
                          br())
                  )
            )),
   tabPanel("Comparative Map",
            titlePanel("Comparative Map"),
-           h4("This geographic representation allows for a similar comparison to
+           h5("This geographic representation allows for a similar comparison to
                that of the interactive map, but the compatible map provides
                additional demographic context for the time period in question.
                All variables have been controlled to only include data from 2000
                to allow for fair comparisons between the data sets. The top map
                can be adjusted by party and by state*, and the bottom state can
                be adjusted by various demographic characterizations."),
-           p("*As with the previous map, unfortunately, county data from Alaska
+           h6("*As with the previous map, unfortunately, county data from Alaska
                was unavailable, so analysis of this state is not included within 
                the map portions of this project."),
+           h5("Please be aware that, unlike in the prior map, the scaling for
+              density adjusts by state and by characteristic. Though this
+              maintains the ability for comparative analysis between counties
+              and among distinct county-level characterizations, it is crucial
+              to be aware of when appraising the state as a whole."),
            fluidPage(
              theme = shinytheme("yeti"),
              titlePanel("Comparisons between Demographic Features"),
@@ -165,8 +186,7 @@ ui <- navbarPage(
                  selectInput(
                    inputId = "party2",
                    label = "Republican or Democrat",
-                   choices = c("Republican" = "republican",
-                               "Democrat" = "democrat")
+                   choices = c("Republican", "Democrat")
                  ),
                  selectInput(
                    inputId = "compare",
@@ -174,7 +194,9 @@ ui <- navbarPage(
                    choices = c("Population Under 20" = "under_20",
                                "Population Over 65" = "over_65",
                                "Rural Population" = "rural_pop",
-                               "Poverty" = "poverty")
+                               "Poverty" = "poverty",
+                               "No Secondary Education" = "no_hs",
+                               "Bachelor's and Beyond" = "higheredu")
                  )),
                
                # Created new inputIds for state, political party, and metric of
@@ -213,8 +235,8 @@ ui <- navbarPage(
            h5("For the first three characteristics, the values under 'Beta'
                 represent the change in the predicted Democratic share given a
                 1% change in population share. For example, hypothetically, if
-                the average share the population under 20 within given county
-                was 50% and this county had a Democratic share of 'x', an
+                the average share of the population under 20 within given county
+                was 50%, and this county had a Democratic share of 'x', an
                 adjustment for a similar county with 51% of its population under
                 20 would, in turn, be approximately x - 0.71596."),
            h5("The final characteristic, year, adjusts as a factor. This means
@@ -224,7 +246,7 @@ ui <- navbarPage(
                 increments of historical context.")))
 
 server <- function(input, output) {
-  output$graph <- renderPlot({
+  output$linegraph <- renderPlot({
     raw_data %>%
       filter(state == input$state1) %>%
       
@@ -251,7 +273,7 @@ server <- function(input, output) {
     
   })
   
-  output$other <- renderPlot({
+  output$race <- renderPlot({
     adjusted_pop_data %>%
       filter(STATE == input$state1) %>%
       ggplot(aes(x = YEAR, y = ELIGIBLE, fill = RACE)) +
@@ -269,14 +291,12 @@ server <- function(input, output) {
     
   })
   
-  output$map <- renderPlot({
+  output$interactivemap <- renderPlot({
     if(input$party == "Democrat"){
       high_color = "dodgerblue3"
-      low_color = "white"
     }
     if(input$party == "Republican"){
       high_color = "firebrick"
-      low_color = "white"
     }
     
     # Used if(){} format here to adjust colors used to convey density on maps
@@ -284,24 +304,12 @@ server <- function(input, output) {
     # Created new objects 'high_color' and 'low_color' to be used as inputs
     # later in code
     
-    county_data %>%
-      filter(party %in% c("democrat", "republican")) %>%
-      mutate(vote_percentage = candidatevotes/totalvotes) %>%
-      distinct(year, party, FIPS, .keep_all = TRUE) %>%
-      pivot_wider(id_cols = c("year", "FIPS"),
-                  names_from = "party",
-                  values_from = "vote_percentage") %>%
-      unnest() %>%
-      left_join(rural, by = "FIPS") %>%
-      mutate(state_name = trimws(str_extract(state, "(?<=,).*"))) %>%
-      select(year, FIPS, democrat, republican, geometry, state_name) %>%
-      rename(Republican = republican,
-             Democrat = democrat) %>%
+    county_party %>%
       filter(state_name == input$state2,
              year == input$year) %>%
       ggplot(aes_string(fill = input$party, geometry = "geometry")) +
         geom_sf() +
-        scale_fill_gradient(high = high_color, low = low_color,
+        scale_fill_gradient(high = high_color, low = "white",
                             limits = c(0, 1)) +
         theme_map() +
         theme(legend.position = "right") +
@@ -310,15 +318,11 @@ server <- function(input, output) {
   })
     
   output$partymap <- renderPlot({
-    if(input$party2 == "democrat"){
+    if(input$party2 == "Democrat"){
       high_color = "dodgerblue3"
-      low_color = "white"
-      NAME = "Democrat"
     }
-    if(input$party2 == "republican"){
+    if(input$party2 == "Republican"){
       high_color = "firebrick"
-      low_color = "white"
-      NAME = "Republican"
     }
     
     # Again, used if(){} format to adjust by political party
@@ -332,9 +336,7 @@ server <- function(input, output) {
       # Also put geometry into quotation marks because of aes_string()
       
       geom_sf() +
-      scale_fill_gradient(high = high_color, low = low_color,
-                          limits = c(0, 1),
-                          name = NAME) +
+      scale_fill_gradient(high = high_color, low = "white") +
       theme_map() +
       theme(legend.position = "right") +
       labs(caption = "Data via MIT Election Data and Science Lab")
@@ -354,6 +356,12 @@ server <- function(input, output) {
     if(input$compare == "poverty"){
       NAME = "Poverty"
     }
+    if(input$compare == "no_hs"){
+      NAME = "No Secondary Education"
+    }
+    if(input$compare == "higheredu"){
+      NAME = "Bachelor's and Beyond"
+    }
     
     # Again used if(){} format, this time to change the title labels for each of
     # the gradient legends
@@ -364,7 +372,6 @@ server <- function(input, output) {
       ggplot(aes_string(fill = input$compare, geometry = "geometry")) +
       geom_sf() +
       scale_fill_gradient(high = "#242440", low = "white",
-                          limits = c(0, 1),
                           name = NAME) +
       theme_map() +
       theme(legend.position = "right")
